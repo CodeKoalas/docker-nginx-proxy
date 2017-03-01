@@ -306,6 +306,10 @@ server {
 		include /etc/nginx/vhost.d/default_location;
 		{{ end }}
 	}
+        error_page 502 /502.html;
+        location = /502.html {
+                root  /app;
+        }
 }
 
 {{ end }}
@@ -352,6 +356,10 @@ server {
 		include /etc/nginx/vhost.d/default_location;
 		{{ end }}
 	}
+        error_page 502 /502.html;
+        location = /502.html {
+                root  /app;
+        }
 }
 
 {{ if (and (not $is_https) (exists "/etc/nginx/certs/default.crt") (exists "/etc/nginx/certs/default.key")) }}
