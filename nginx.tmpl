@@ -91,10 +91,11 @@ proxy_set_header Proxy "";
 {{ $enable_ipv6 := eq (or ($.Env.ENABLE_IPV6) "") "true" }}
 server {
 	server_name _; # This is just an invalid value which will never trigger on a real hostname.
-	listen 80;
+	listen 80 proxy_protocol;
 	{{ if $enable_ipv6 }}
-	listen [::]:80;
+	listen [::]:80 proxy_protocol;
 	{{ end }}
+
 	access_log /var/log/nginx/access.log vhost;
 	location = /status.txt {
 		root /app;
@@ -107,10 +108,11 @@ server {
 {{ if (and (exists "/etc/nginx/certs/default.crt") (exists "/etc/nginx/certs/default.key")) }}
 server {
 	server_name _; # This is just an invalid value which will never trigger on a real hostname.
-	listen 443 ssl http2;
+	listen 443 proxy_protocol ssl http2;
 	{{ if $enable_ipv6 }}
-	listen [::]:443 ssl http2;
+	listen [::]:443 proxy_protocol ssl http2;
 	{{ end }}
+
 	access_log /var/log/nginx/access.log vhost;
 	return 503;
 
@@ -198,9 +200,9 @@ upstream {{ $upstream_name }} {
 {{ if eq $https_method "redirect" }}
 server {
 	server_name {{ $host }};
-	listen 80 {{ $default_server }};
+	listen 80 proxy_protocol {{ $default_server }};
 	{{ if $enable_ipv6 }}
-	listen [::]:80 {{ $default_server }};
+	listen [::]:80 proxy_protocol {{ $default_server }};
 	{{ end }}
 	access_log /var/log/nginx/access.log vhost;
 	return 301 https://$host$request_uri;
@@ -209,9 +211,9 @@ server {
 
 server {
 	server_name {{ $host }};
-	listen 443 ssl http2 {{ $default_server }};
+	listen 443 proxy_protocol ssl http2 {{ $default_server }};
 	{{ if $enable_ipv6 }}
-	listen [::]:443 ssl http2 {{ $default_server }};
+	listen [::]:443 proxy_protocol ssl http2 {{ $default_server }};
 	{{ end }}
 	access_log /var/log/nginx/access.log vhost;
 
@@ -248,6 +250,14 @@ server {
 	ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
 	ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:DHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:AES256-GCM-SHA384:AES256-SHA256:AES256-SHA:DHE-DSS-AES128-SHA';
 	{{ end }}
+
+	client_max_body_size 100m;
+	proxy_connect_timeout 600;
+	proxy_send_timeout 600;
+	proxy_read_timeout 600;
+	send_timeout 600;
+        set_real_ip_from 10.0.0.0/8;
+        real_ip_header proxy_protocol;
 
 	ssl_prefer_server_ciphers on;
 	ssl_session_timeout 5m;
@@ -297,7 +307,7 @@ server {
 
 		{{ if (exists (printf "/etc/nginx/htpasswd/%s" $host)) }}
 		auth_basic	"Restricted {{ $host }}";
-		auth_basic_user_file	{{ (printf "/etc/nginx/htpasswd/%s" $host) }};
+		auth_basic_user_file	{{ (prin/tf "/etc/nginx/htpasswd/%s" $host) }};
 		{{ end }}
 		{{ if (exists (printf "/etc/nginx/vhost.d/%s_location" $host)) }}
 		include {{ printf "/etc/nginx/vhost.d/%s_location" $host}};
@@ -317,10 +327,11 @@ server {
 
 server {
 	server_name {{ $host }};
-	listen 80 {{ $default_server }};
+	80 proxy_protocol {{ $default_server }};
 	{{ if $enable_ipv6 }}
-	listen [::]:80 {{ $default_server }};
+	listen [::]:80 proxy_protocol {{ $default_server }};
 	{{ end }}
+
 	access_log /var/log/nginx/access.log vhost;
 
 	{{ if eq $network_tag "internal" }}
@@ -364,9 +375,9 @@ server {
 {{ if (and (not $is_https) (exists "/etc/nginx/certs/default.crt") (exists "/etc/nginx/certs/default.key")) }}
 server {
 	server_name {{ $host }};
-	listen 443 ssl http2 {{ $default_server }};
+	listen 443 proxy_protocol ssl http2 {{ $default_server }};
 	{{ if $enable_ipv6 }}
-	listen [::]:443 ssl http2 {{ $default_server }};
+	listen [::]:443 proxy_protocol ssl http2 {{ $default_server }};
 	{{ end }}
 	access_log /var/log/nginx/access.log vhost;
 	return 500;
